@@ -1,0 +1,8 @@
+337caed1d8ba546dbf1f53e2a078d8f1 *DESCRIPTION
+86d60cedd56d0c8a850a255443949bb1 *NAMESPACE
+a45337db897b844f6660aa608ed12b96 *R/SpectralClMixed.R
+7739e1096bec2c601dafdc6817704b1d *R/mspec.R
+ed58b9fde4685a47ba9cb7a378cf1bb7 *man/SpectralClMixed.Rd
+a26c2d9a6671d7f61968931782c3cc79 *man/mspec.Rd
+6e8597fc90f4dffc59ade180610ddb30 *man/plot.SpectralClMixed.Rd
+1761332b3528cf7b53e25320079cbcc6 *man/summary.SpectralClMixed.Rd

@@ -1,0 +1,8 @@
+S3method(plot,SpectralClMixed)
+S3method(summary,SpectralClMixed)
+export(mspec)
+import(RSpectra, cluster,GGally)
+importFrom("graphics", "pairs", "par")
+importFrom("stats", "dist", "kmeans", "median")
+importFrom("graphics", "pairs","par")
+importFrom("ggplot2", "ggtitle","theme_bw","scale_color_discrete")
