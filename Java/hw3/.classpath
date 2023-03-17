@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="4.18"/>
+	<classpathentry kind="src" path="4.15"/>
+	<classpathentry kind="src" path="4.20"/>
+	<classpathentry kind="src" path="4.22"/>
+	<classpathentry kind="src" path="5.2"/>
+	<classpathentry kind="src" path="5.4"/>
+	<classpathentry kind="src" path="mvc"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

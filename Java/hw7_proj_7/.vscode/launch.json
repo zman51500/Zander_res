@@ -1,0 +1,25 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "CodeLens (Launch) - SimpledokuGrid",
+            "request": "launch",
+            "mainClass": "hw7_proj_7/simpledoku.SimpledokuGrid",
+            "projectName": "hw7_proj_7"
+        },
+        {
+            "type": "java",
+            "name": "CodeLens (Launch) - SimpledokuSolver",
+            "request": "launch",
+            "mainClass": "hw7_proj_7/simpledoku.SimpledokuSolver",
+            "projectName": "hw7_proj_7"
+        },
+        {
+            "type": "java",
+            "name": "CodeLens (Launch) - SimpledokuBot",
+            "request": "launch",
+            "mainClass": "hw7_proj_7/simpledoku.SimpledokuBot",
+            "projectName": "hw7_proj_7"
+        }
+    ]
+}

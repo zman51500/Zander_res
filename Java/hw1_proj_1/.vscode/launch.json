@@ -1,0 +1,18 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "CodeLens (Launch) - MassAverager",
+            "request": "launch",
+            "mainClass": "planets.MassAverager",
+            "projectName": "hw1_proj_1"
+        },
+        {
+            "type": "java",
+            "name": "CodeLens (Launch) - Homework1Grader",
+            "request": "launch",
+            "mainClass": "planets.Homework1Grader",
+            "projectName": "hw1_proj_1"
+        }
+    ]
+}
