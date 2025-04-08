@@ -1,0 +1,128 @@
+---
+title: "ANCOVA"
+author: "Zander Bonnet"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+miniPONS <- read.csv("~/Desktop/GCU/DSC_520/Data/Database MiniPONS.csv", sep=";", stringsAsFactors=TRUE)
+sum(is.na(miniPONS))
+head(miniPONS)
+```
+
+```{r,fig.height= 8, fig.width= 12}
+library(ggplot2)
+library(reshape2)
+
+corr_mat <- round(cor(miniPONS[,-c(1:2)]),3)
+melt_corr_mat <- melt(corr_mat)
+plt <- ggplot(data = melt_corr_mat, aes(x = Var1, y = Var2, fill = value)) 
+plt <- plt + geom_tile()
+plt <- plt + geom_text(aes(Var2, Var1, label = value), color = "white", size = 6)
+plt <- plt + labs(title = 'Heatmap')
+plt
+```
+
+```{r, fig.height=8, fig.width=8}
+plt <- ggplot(data = miniPONS, aes(x = Age, y = Right_answers, colour = factor(Type)))
+plt <- plt + geom_point() + geom_smooth(method = lm)
+plt
+```
+
+It is feasible that the types are parallel to each other as the BD1, BD2, and control groups are all roughly parallel and the UD group could possibly be parallel as the parallel line is in the error range.
+
+BD1, BD2, and the UD groups have similar trend lines so they may not significantly different.
+
+1.  Factor A - The main treatment effect: a) The adjusted population group means are all equal. b) The effect of each group equals zero.
+
+    This is the categorical variable type.
+
+    This means that all the groups means will be equal. In this case the various types will all have a similar mean Right answers. If any one group does not have a similar mean the null hypothesis will be rejected. The adjusted group mean would be the mean of the population minus the mean of each individual group. This would show if one group deviated from the population mean. If the effect of each group was zero then that would mean there was no difference in right answers between groups.
+
+2.  Factor B - The covariate effect: a) The pooled population slope equals zero.
+
+    This is true for all covariates. In this analysis they are Age and submisive.
+
+    The null states that the effect of the covariate is zero. This would be true if the covariate has no impact on the amount of right answers. This will be violated if the covariate has an effect size of nonzero and is statistically significant.
+
+In this ANCOVA I will use Age, Type, and submisive to predict the number of right answers.
+
+```{r}
+mod <- lm(Right_answers ~ Age + Type + Submissive, data = miniPONS)
+summary(mod)
+```
+
+Age, Submissive, and Type all prove to be significant factors. Type is significant because the control groups mean is significantly different from BD1. This means that the null hypothesis the adjusted group means is zero is rejected, and they must be different. Part b of the hypothesis states that the effect of the constant is 0, but we can see that the effect size is 1.34 for the control group. and that is not 0, so that part of the null is also rejected.
+
+For the covariates the null states that the pulled population slope is equal to zero. This is rejected for both of our covariates because they both have nonzero effect sizes and statistically significant.
+
+1.  Age and Submissive are coviariates and Type is a categorical variable.
+2.  The standard error in the response is 2.715
+3.  F ratios
+    1.  BD2 - -.317 F ratio. This is not significantly different in BD1, so it is not significant in predicting Right answers
+    2.  Control - 2.951 F ratio. This is significantly different then BD1, so it is significant in predicting Right answers.
+    3.  UD - -.328 F ratio. This is not significantly different from BD1, so it is not significant in predicting Right answers
+
+4.Covariate levels
+
+1.  Age - -2.4 t value.This is significant in predicting Right answers
+2.  Submissive - 19.542 t value. This is very significant in predicting Right answers.
+
+```{r, fig.height=10, fig.width=10}
+par(mfrow = c(2,2))
+plot(mod)
+```
+
+```{r}
+boxplot(mod$residuals)
+```
+
+Residuals appear to be normally distributed by looking at the boxplot. There is no visual skewness, the IQR is even and tighter then the two tails.
+
+```{r}
+plot(mod,1)
+```
+
+The residuals are equally distributed and random.
+
+```{r}
+library(car)
+durbinWatsonTest(mod)
+```
+
+There is no evidence of autocorrelation so the residuals are independent.
+
+```{r}
+library(patchwork)
+p1 <- ggplot(miniPONS,aes(Age,Right_answers)) + geom_point() + geom_smooth(method = lm)
+p2 <- ggplot(miniPONS,aes(Submissive,Right_answers)) + geom_point() + geom_smooth(method = lm)
+
+p1 + p2
+```
+
+Each of the covariates appear to have roughly linear relationships with the response.
+
+```{r}
+(ggplot(miniPONS) + geom_point(aes(Age, Right_answers)) + geom_point(aes(Age, mod$fitted.values,colour = 'red')) + labs(color = 'fitted value'))
+```
+
+We can see that the predicted values line up fairly well with the original values of the data.
+
+All of the assumptions of the model are met, so we can use this model.
+
+```{r}
+sum(mod$residuals<=5 & mod$residuals >= -5)/length(mod$residuals)
+```
+
+We can see that the model does a fairly good job at predicting values based on the Age Vs.Right_answers plot when comparing the true value to the predicted. The model does meet all the assumptions of linear models and the model is significant with a very low p-value for both the overall model and the intercept. There is a decent r-squared value most the variation in the response is explained. I would say that the predictions from this model are good, but not excellent. One could use this model to generally estimate the number of right answers with the prediction being within 5 points of the true score 93.86% of the time based on this data.
+
+I would be confident to use this model to make educated estimates based on the factors utilized above.
+
+### Reference
+
+Theory of mind in remitted bipolar disorder. (2019). Kaggle [Dataset]. <https://www.kaggle.com/datasets/mercheovejero/theory-of-mind-in-remitted-bipolar-disorder/data>

@@ -1,0 +1,182 @@
+---
+title: "Survival"
+author: "Zander Bonnet"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+echocardiogram <- read.csv("~/Desktop/GCU/DSC_520/Data/echocardiogram/echocardiogram.data", header=FALSE)
+colnames(echocardiogram) <- c('survival','still-alive','age-at-heart-attack',
+                        "pericardial-effusion","fractional-shortening",
+                        "epss","lvdd","wall-motion-score",
+                        "wall-motion-index","mult","name",
+                        "group","alive-at-1")
+echocardiogram[,(c('name', 'group'))] <- list(NULL)
+
+suppressWarnings(echocardiogram$survival <- as.numeric(echocardiogram$survival))
+
+echocardiogram$`still-alive` <- factor(echocardiogram$`still-alive`, levels = c(0,1))
+
+suppressWarnings(echocardiogram$`age-at-heart-attack` <- as.numeric(echocardiogram$`age-at-heart-attack`))
+
+echocardiogram$`pericardial-effusion` <- factor(echocardiogram$`pericardial-effusion`, levels = c(0,1))
+
+suppressWarnings(echocardiogram$`fractional-shortening` <- as.numeric(echocardiogram$`fractional-shortening`))
+
+suppressWarnings(echocardiogram$epss <- as.numeric(echocardiogram$epss))
+
+suppressWarnings(echocardiogram$lvdd <- as.numeric(echocardiogram$lvdd))
+
+suppressWarnings(echocardiogram$`wall-motion-score` <- as.numeric(echocardiogram$`wall-motion-score`))
+
+suppressWarnings(echocardiogram$`wall-motion-index` <- as.numeric(echocardiogram$`wall-motion-index`))
+
+suppressWarnings(echocardiogram$mult <- as.numeric(echocardiogram$mult))
+
+echocardiogram <- na.omit(echocardiogram)
+
+echocardiogram$`alive-at-1` <- ifelse((echocardiogram$survival >= 12 | echocardiogram$`still-alive` == 1),1,0)
+  
+echocardiogram$`alive-at-1` <- factor(echocardiogram$`alive-at-1`, levels = c(0,1))
+echocardiogram <- na.omit(echocardiogram)
+head(echocardiogram)
+```
+
+First I must clean the dataset, so that it can be used. I assigned every factor its desired data type, and fixed the alive at 1 year factor as it can be easily manually filled. I then removed the data with missing values since they tended to have multiple missing data points if they were missing one.
+
+```{r}
+# Load in libraries
+library(knitr)
+library(devtools)
+library(survival)
+library(tidyverse)
+library(survminer)
+library(ggplot2)
+library(ggfortify)
+```
+
+```{r}
+kable(echocardiogram)
+plot(echocardiogram)
+```
+
+We can see that there are a handful of possibly correlated factors, and there are no visual extreme outliers.
+
+In this we will aim to answer if there is a difference in survival rates between individuals with percardial effusion and without pericaridal effusion.
+
+```{r}
+sur <- Surv(echocardiogram$survival, as.numeric(as.character(echocardiogram$`still-alive`)))
+print(sur)
+
+fit <- survfit(sur ~ 1 , data = echocardiogram )
+summary(fit)
+autoplot(fit, ylab = 'Survival',  xlab = 'Time After Heart Attack', legLabs = c('dead','alive'))
+```
+
+When analyzing survival over time we can see that the more time after the heart attack the less likely the surviuval is.
+
+```{r}
+ggsurvplot(fit = fit, data = echocardiogram)
+```
+
+This shows a similar story with the error bar included.
+
+```{r}
+fit2 <- survfit(sur ~ as.numeric(as.character(`pericardial-effusion`)) , data = echocardiogram )
+summary(fit2)
+ggsurvplot(fit = fit2, data = echocardiogram)
+```
+
+When splitting it between paricardial effusion we can see that having pericardial effusion tends to leave to a lower survival chance over time.
+
+```{r}
+dif <- survdiff(sur ~ as.numeric(as.character(`pericardial-effusion`)) , data = echocardiogram)
+dif
+
+ggsurvplot(fit = fit2, data = echocardiogram, surv.median.line = 'hv',pval = TRUE, conf.int = TRUE)
+```
+
+When including the error bars we can see that there is a lot of overlap so, there may not be a significant difference in the two groups. By then looking at the log rank test we can see that there is p-value of .1, so there is not significant evidence to prove that the two survival curves are different, at a critical value of .05.
+
+```{r}
+write.csv(echocardiogram, 'echo.csv')
+```
+
+# Python
+
+```{python}
+import lifelines as lf
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+```
+
+```{python}
+echo = pd.read_csv('echo.csv', index_col = 0)
+echo.head()
+```
+
+```{python}
+kmf = lf.KaplanMeierFitter()
+kmf.fit(echo['survival'],echo['still-alive'])
+kmf.plot_survival_function()
+plt.show()
+plt.close()
+```
+
+```{python}
+kmf.plot_survival_function(title= 'Kaplan-Meier Survival Curve', xlabel='Time', ylabel='Survival Probability')
+plt.show()
+plt.close()
+```
+
+```{python}
+ax = plt.subplot(111)
+
+kmf2 = lf.KaplanMeierFitter()
+kmf2.fit(echo.loc[echo['pericardial-effusion'] == 1]['survival'],echo.loc[echo['pericardial-effusion'] == 1]['still-alive'], label = 'Pericardial Effusion')
+kmf2.plot_survival_function(ax=ax)
+
+kmf2.fit(echo.loc[echo['pericardial-effusion'] == 0]['survival'],echo.loc[echo['pericardial-effusion'] == 0]['still-alive'], label = 'No Pericardial Effusion')
+kmf2.plot_survival_function(ax=ax)
+
+plt.show()
+plt.close()
+```
+```{python}
+results = lf.statistics.logrank_test(echo.loc[echo['pericardial-effusion'] == 1]['survival'], echo.loc[echo['pericardial-effusion'] == 0]['survival'], event_observed_A=echo.loc[echo['pericardial-effusion'] == 1]['still-alive'], event_observed_B=echo.loc[echo['pericardial-effusion'] == 0]['still-alive'])
+
+results
+```
+```{python}
+
+ax = plt.subplot(111)
+
+kmf2 = lf.KaplanMeierFitter()
+kmf2.fit(echo.loc[echo['pericardial-effusion'] == 1]['survival'],echo.loc[echo['pericardial-effusion'] == 1]['still-alive'], label = 'Pericardial Effusion')
+kmf2.plot_survival_function(ax=ax)
+
+kmf2.fit(echo.loc[echo['pericardial-effusion'] == 0]['survival'],echo.loc[echo['pericardial-effusion'] == 0]['still-alive'], label = 'No Pericardial Effusion')
+kmf2.plot_survival_function(ax=ax,title= 'Kaplan-Meier Survival Curve', xlabel='Time', ylabel='Survival Probability')
+
+plt.text(s = "log-rank p-value: {:.2}".format(results.p_value), x = 0, y= .3 )
+    
+plt.show()
+plt.close()
+```
+
+We came to the same conclusion as in R where there is not a significant difference in the two groups. There is a p-value of .1 which is not significant at the .05 level.
+
+
+
+In the end we found that there is no significant difference in survival rates in the groups with pericardial effusion and without pericardial effusion. The dataset is fairly small, so we might be able to make a more definitive conclusion if we were able to increase the sample size.
+
+# References
+
+Echocardiogram. (1989). UCI Machine Learning Repository. https://doi.org/10.24432/C5QW24.
+

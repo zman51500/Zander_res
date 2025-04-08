@@ -1,0 +1,190 @@
+---
+title: "Multiple Regression"
+author: "Zander Bonnet"
+date: "2024-05-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(data.table)
+set.seed(12345)
+adosleep <- data.table(
+  SOLacti = rnorm(150, 4.4, 1.3) ^ 2,
+  DBAS =  rnorm(150, 72, 26),
+  DAS =  rnorm(150, 125, 32),
+  Female = rbinom(150, 1, .53),
+  Stress = rnorm(150, 32, 11)
+)
+
+adosleep[, SSQ :=
+           rnorm(
+             150,
+             (.36 * 3 / 12.5) * SOLacti +
+               (.16 * 3 / 26) * DBAS +
+               (.18 * 3 / .5) * Female +
+               (.20 * 3 / 11) * Stress,
+             2.6
+           )]
+
+adosleep[, MOOD :=
+           rnorm(
+             150,
+             (-.07 / 12.5) * SOLacti +
+               (.29 / 3) * SSQ +
+               (.14 / 26) * DBAS +
+               (.21 / 32) * DAS +
+               (.12 / 32) * SSQ * (DAS - 50) +
+               (.44 / .5) * Female +
+               (.28 / 11) * Stress,
+             2
+           )]
+
+adosleep[, Female := factor(Female, levels=0:1, labels = c("Males", "Females"))]
+
+head(adosleep)
+sum(is.na(adosleep))
+```
+
+The data has been simulated, and there are no missing values for us to worry about.
+
+```{r}
+library(JWileymisc)
+
+d <- testDistribution(adosleep$MOOD)
+paste('MOOD', d$distr  ,'-> LLH', d$Distribution$LL, 
+      'Outlier:', d$extremevalues)
+
+d <- testDistribution(adosleep$SSQ)
+paste('SSQ', d$distr  ,'-> LLH', d$Distribution$LL, 
+      'Outlier:', d$extremevalues)
+
+d <- testDistribution(adosleep$SOLacti)
+paste('SOLacti', d$distr  ,'-> LLH', d$Distribution$LL, 
+      'Outlier:', d$extremevalues)
+
+d <- testDistribution(adosleep$DAS)
+paste('DAS', d$distr  ,'-> LLH', d$Distribution$LL, 
+      'Outlier:', d$extremevalues)
+
+hist(adosleep[,c('MOOD','SSQ','SOLacti','DAS')])
+
+```
+
+All of the LLH values are sufficiently large to say that the distributions fit a normal distribution. There are also no extreme values in the data. We can also see in the histograms that all of the variables are roughly normal.
+
+```{r}
+library(ggplot2)
+library(reshape2)
+
+corr_mat <- round(cor(adosleep[,c('SSQ', 'MOOD', 'Stress', 'SOLacti', 'DAS', 'DBAS')]),3)
+melt_corr_mat <- melt(corr_mat)
+plt <- ggplot(data = melt_corr_mat, aes(x = Var1, y = Var2, fill = value)) 
+plt <- plt + geom_tile()
+plt <- plt + geom_text(aes(Var2, Var1, label = value), color = "white", size = 4)
+plt <- plt + labs(title = 'Heatmap')
+plt
+```
+
+```{r}
+egltable(adosleep)
+stan_lacti <- as.vector(scale(adosleep$SOLacti))
+stan_dbas <- as.vector(scale(adosleep$DBAS))
+stan_das <- as.vector(scale(adosleep$DAS))
+stan_stress <- as.vector(scale(adosleep$Stress))
+
+standardized <- data.frame(
+  SOLacti = stan_lacti,
+  DBAS = stan_dbas,
+  DAS = stan_das,
+  Female = adosleep$Female,
+  STRESS = stan_stress,
+  SSQ = adosleep$SSQ,
+  MOOD =adosleep$MOOD
+  )
+
+head(standardized)
+```
+
+```{r}
+mod1 <- lm(MOOD~Female + STRESS, data = standardized)
+summary(mod1)
+```
+
+Both Female and stress are significant in the model. The model has a very small r-squared, so we need more facotrs to explain the variance in mood.
+
+```{r}
+mod2 <- lm(MOOD~., data = standardized)
+summary(mod2)
+
+mod2 <-  lm(MOOD~. -  SOLacti - DBAS, data = standardized)
+summary(mod2)
+```
+
+The R-Squared value increased significantly, but there were two factors that are not significant, DBAS and SOLacti, so I removed them and this again improved the R-Squared and significance of the model.
+
+```{r}
+mod3 <-  lm(MOOD~. + (SSQ*DAS) -  SOLacti - DBAS, data = standardized)
+summary(mod3)
+mod3 <- lm(MOOD~. + (SSQ*DAS) -  SOLacti - DBAS - DAS, data = standardized)
+summary(mod3)
+```
+
+Adding the interaction of the DAS and SSQ made DAS an insignificant factor. Removing it made the model more significant and only slightly lowered the R-Squared.
+
+```{r}
+library(texreg)
+screenreg(list(mod1,mod2,mod3))
+```
+
+Model 1 does not include DAS or SSQ
+
+Model 2 finds that both DAS and SSQ are significant predictors at the .001 level. Meaning that they are very significant predictors of mood.
+
+Model 3 did not find DAS to be significant, but SSQ is still significant. The interaction between DAS and SSQ is also significant.
+
+Model 3 has a slightly larger impact of SSQ as well in model 2 SSQ's constant is .3 and in model 3 it is .31.
+
+```{r}
+library(regclass)
+print('mod1')
+print(VIF(mod1))
+print(testDistribution(mod1$residuals)$Distribution$LL)
+print('mod2')
+print(VIF(mod2))
+print(testDistribution(mod2$residuals)$Distribution$LL)
+print('mod3')
+print(VIF(mod3))
+print(testDistribution(mod3$residuals)$Distribution$LL)
+
+```
+
+All models have residuals that fit the normality assumption and have very low VIF's. This shows that the residuals are homoscedastic, and the assumptions of the model are met.
+
+```{r}
+mod4 <- lm(MOOD~. + (SSQ*DAS) -  SOLacti - DBAS - DAS, data = adosleep)
+summary(mod4)
+```
+
+The model of raw data is significant but the intercept is not found to be significant. This means that our model cannot be accurate. The model does not know what the baseline for the origin of the data is, so we cannot use this model for small predictions. The R-Squared is similar to the standardized models, so it does explain the variance in a similar way, but fails to know where to start the estimate.
+
+```{r}
+(ggplot(standardized, aes(SSQ, MOOD))
+  +geom_line(linewidth = 2)
+  +scale_x_continuous("Subjective sleep quality\n(higher is worse)")
+  +ylab("Negative Mood")
+  +theme_minimal()
+  +theme(legend.position.inside = c(.85, .15),legend.key.width = unit(2, "cm")))
+
+```
+
+This plot shows that as SSQ increases the negative mood also increases on average.
+
+\*\* linetype = DAS caused an error message as DAS is a continuous variable
+
+\*\* the theme cowplot is also no longer supported
+
+We were able to address the original objective of what factors can we use to predict the mood of an individual. It was found that SOLacti was not significant in predicting mood, but SSQ was very significant in the prediction of mood. It was also found that SSQ is a very significant factor in predicting the the mood of an individual. This was found by conducting linear analysis. In this analysis we discovered what factors were significant in predicting mood, and how significant they are. We found that SSQ and being a Female are the most significant factors in predicting mood, and in a model with the interaction between SSQ and DAS that is the most significant factor in predicting mood.

@@ -1,0 +1,159 @@
+---
+title: "Logistic Regression"
+author: "Zander Bonnet"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+app_rec <- read.csv('/Users/zanderbonnet/Desktop/GCU/DSC_520/Data/CreditCard/application_record.csv')
+head(app_rec)
+summary(app_rec)
+```
+
+To make the approved variable I took a handful of variables and used them determine if the application should be approved or not. These variables include the total income, number of children, number of family members, and length of employment.
+
+```{r}
+approve <- function(x){
+  aprove = 0
+  if(x[6] > 190000){
+    aprove = aprove + .8
+  }
+  if(x[12] < 1000){
+    aprove = aprove + .3
+  }
+  aprove = aprove - .1*as.numeric(x[5])
+  aprove = aprove + .1*as.numeric(x[18])
+  if(x[3] == 'Y'){
+    aprove = aprove + .3
+  }
+  if(aprove >.5){
+    return(1)
+  }
+  else{
+    return(0)
+  }
+}
+
+app_rec$APPROVED = apply(app_rec,1, approve)
+sum(app_rec$APPROVED)
+```
+
+I then clean the data by first removing the blank occupations, as they are just non-responces. This does not represent unemployed.
+
+```{r}
+clean <- app_rec[app_rec$OCCUPATION_TYPE != "",]
+```
+
+```{r}
+#. A function to calculate the z-score of a variable
+zscore <- function(x){
+  z <- (x - mean(x))/sd(x)
+  return(z)
+  }
+```
+
+I then calculate the zscore of the numerical predictors so we can remove any outliers.
+
+```{r}
+num <- c('CNT_CHILDREN','AMT_INCOME_TOTAL',"DAYS_BIRTH","DAYS_EMPLOYED","CNT_FAM_MEMBERS")
+z <- sapply(clean[,num], zscore)
+summary(z)
+```
+
+I then removed any outliers of over 3 SD away from the mean from the predictors. We can do this because the dataset is huge, so we will not lose any information.
+
+```{r}
+clean <- na.omit(clean[which(z<=3 & z>=-3),])
+clean$FLAG_OWN_CAR <- ifelse(clean$FLAG_OWN_CAR == 'Y', 1, 0)
+summary(clean)
+```
+
+I will use logistic regression to predict the approval of a loan based on the given factors from the loan application.
+
+I split the data into a training and testing set, where 70% of the data is in the training set and 30% is in the testing set.
+
+```{r}
+set.seed(100)
+trainind <- sample(seq_len(nrow(clean)), size = nrow(clean)*.7)
+train <- clean[trainind,]
+test <- clean[-trainind,]
+```
+
+Here I make the model using occupation type, gender, total income, number of children, and number of family members.
+
+```{r}
+mod <- glm(APPROVED~ OCCUPATION_TYPE + 
+             CODE_GENDER  + AMT_INCOME_TOTAL + CNT_CHILDREN + CNT_FAM_MEMBERS,
+           data = train,family = binomial)
+summary(mod)
+
+```
+
+The model results in all the factors being very significant with extremely low p-values.
+
+```{r}
+anova(mod, test = 'Chisq')
+```
+
+To check the significance of all the predictors I use ANOVA to show that all the predictors are significant in predicting the response.
+
+Looking at the training data we can see that the model is 69% accurate in predicting approval in the training data. By looking at the ROC curve we can see that the model does not perform extremely well with only 72.9% of the area being under the curve. We can also see to get our true positive rate to about 80% our false positive rate would have to be about 60%, so the model does not perform great.
+
+```{r}
+library(ROCR) 
+library(Metrics)
+
+
+preds <- predict(mod, type = 'response')
+glm.pred <- rep("0", nrow(train))
+glm.pred[preds > .5] = "1"
+
+table(glm.pred, train$APPROVED)
+mean(glm.pred == train$APPROVED)
+
+pr <- prediction(preds ,train$APPROVED)
+perf <- performance(pr,measure = "tpr",x.measure = "fpr") 
+auc(train$APPROVED,preds)
+plot(perf)
+
+```
+
+```{r}
+library(regclass)
+VIF(mod)
+```
+
+When looking at the VIF we see that there is no multicoliniarity in the predictors, There is a possibility between the number of children and family members, but the VIF is not large enough to make us definitively say that that is the case. Since there is no strong evidence of multicolliniarity the model can remain as is.
+
+```{r}
+pred <- predict(mod, newdata = test, type = 'response')
+pred <- ifelse(pred >.5, 1,0)
+
+table(pred, test$APPROVED)
+mean(pred == test$APPROVED)
+```
+
+When using the model to predict the testing data we get a 68.9% success rate. This shows that the model is not over fit to the training data, because the model performed very similarly on on the two independent sets. The model seems to have a higher rate of false negatives then false possitives. This means that the model will not award loans to undeserving applicants as often as not giving loans to qualified applicants.
+
+```{r}
+pred <- predict(mod, newdata = clean, type = 'response')
+pred <- ifelse(pred >.5, 1,0)
+
+table(pred, clean$APPROVED)
+mean(pred == clean$APPROVED)
+```
+
+When using the model to predict the entire cleaned data set we get again a very similar result of about a 69% success rate. We can also see that the model has a high rate of false negatives, shown in the top right of the table.
+
+In the end the model does not perform very well to predict the outcome of the loan application with a success rate of about 70%. It does lean towards resulting false negatives though so it is less likely to give loans to unqualified applicants. This does mean that the model will not award loans to qualified applicants more often though. In a risk assessment for the business this may be the more desirable approach.
+
+To improve this model I might consider diving deeper into the different predictive factors in the model. I might use backwards selection, starting with all the predictors, to find the most effective predictors. I might also chose to use transformations on some of the predictors, like income, to see how that might effect the efficacy. Especially because some of th emore extreme values of that variable were removed by the outlier treatment. By doing this we might be able to get more accurate based on the income predictor.
+
+### Reference
+
+Credit Card Approval Prediction. (2020). Kaggle [Dataset]. <https://www.kaggle.com/datasets/rikdifos/credit-card-approval-prediction>.

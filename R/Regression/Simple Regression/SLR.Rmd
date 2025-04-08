@@ -1,0 +1,134 @@
+---
+title: "SLR Assignment"
+author: 'Zander Bonnet'
+date: 'Apr 24, 2024'
+output: 
+  html_document: default
+  html_notebook: default
+---
+
+## Multivariate Vs. Simple Regression
+
+The difference in multivariate and simple linear regression is that simple linear regression uses one independent variable, and multivariate regression utilizes two or more independent variables. Multivariate regression also has an additional assumption that the independent variables can't be colinear, as this will violate the multicoliniarity assumption. In this example I will use weight of the vehicle to predict the mpg of it, so it is simple linear regression. If I utilized weight, horsepower, year made, and so on it would become multivariate linear regression as there are multiple factors used in the model.
+
+## Simple Regression Question
+
+In this analysis I will create a simple regression model to answer the question of if you can use the weight of a vehicle to predict the mpg of that vehicle. If we can by how much?
+
+```{r}
+mpg <- read.table("~/Desktop/GCU/DSC_520/Data/auto+mpg/auto-mpg.data")
+colnames(mpg) <- c('mpg', 'cylinders','displacment',  'horsepower', 'weight', 'acceleration', 'model.year', 'orgin', 'car.name')
+mpg$horsepower <- as.integer(mpg$horsepower)
+```
+
+```{r}
+#Finds meaasures of central tendancy
+summary(mpg)
+```
+
+From looking at the measures of central tendency we can see that there is potential skewness in the displacement and horsepower factors as they have a large difference in the mean and median. We can even see that they appear to be positively skewed because the mean is larger than the median. MPG and acceleration of similar means and medians, so they appear to be the most uniformly distributed.
+
+```{r Fig1, echo=TRUE, fig.height = 12, fig.width=12}
+plot(mpg)
+```
+
+## Variables
+
+The independent variables are cylinders, displacement, horsepower, weight, acceleration, model year, and origin.The dependent variable is the mpg of the vehicle. The car name is just an identifier.
+
+```{r}
+#identifies missing values and removes them
+mpg[which(is.na(mpg$horsepower) == TRUE),]
+mpg <- na.omit(mpg)
+```
+
+```{r}
+#finds any outliers
+low <- quantile(mpg$mpg, .25)
+up <- quantile(mpg$mpg, .75)
+iqr <- IQR(mpg$mpg)
+
+lowthresh <- low - (1.5 * iqr)
+upthresh <- up + (1.5 * iqr)
+
+which(mpg$mpg < lowthresh | mpg$mpg > upthresh)
+```
+
+```{r}
+#identifies if any missing values remain
+sum(is.na(iris))
+```
+
+There are no outliers in the dependent variable, and the missing values were all in the horsepower factor. I chose to remove the data with missing values because there were only a handful.
+
+```{r}
+#gets measure of spread of the data
+var(mpg[-9])
+```
+
+If you look at the diagnal of the matrix you can see the variances for each variable. The other values represent the covariances for the corresponding variables. Displacement appears to have the largest spread of data as it has a very large variance comparative to its mean. Weight also appears to have a lot of variation in the data. Acceleration appears to have the smallest relative variance.
+
+```{r Fig2, echo=TRUE, fig.height = 7, fig.width=15}
+library('moments')
+par(mfrow = c(2,4))
+for(i in names(mpg[1:9])){
+  if(is.numeric(mpg[1,i])) {
+    hist(mpg[,i], xlab = NULL, main = i)
+    legend('topright', legend = c(paste('Skewness:',round(skewness(mpg[,i]),4))
+                              ,paste('Kurtosis:',round(kurtosis(mpg[,i]),4)),
+                              paste('Shapiro-Wilk P-Value:', round(shapiro.test(mpg[,i])$p.value, 4))))
+  }
+}
+```
+
+All of the factors have a slight to slightly significant positive skew. The horsepower factor is the most skewed, and model year has the least skew. All of the data also has a positive kurtosis value, so the data is 'too pointy' compared to a true normal distribution. We can also see if the data fits the normal distribution by looking at the p-value of the Shapiro-Wilks test. We can see that none of the the data appears to follow a normal distribution since all the p-values are less then .05.
+
+In order to create the model we need to make sure that we are not violating the assumptions of linear regression.
+
+The weight and the MPG are independent data points and they do have a linear relationship. We will check for normality and equal variance of the residuals.
+
+```{r}
+mod <- lm(mpg ~ weight,data = mpg)
+summary(mod)
+```
+
+The model is found to be a significant with a F-stat of 878, and both the intercept and the independent variable (weight) have a very small p-value. The model says that if the vehicle weighed 0 zero units it would have an MPG of 46.2. Then for every 1 unit of weight the car will lose .007 MPG.
+
+```{r Fig3, echo=TRUE, fig.height = 7, fig.width=10}
+par(mfrow = c(2,2))
+plot(mod)
+```
+
+Looking at the residuals we can see that the residuals might violate the homoscedasticity assumption at the higher values. To combat this we can try and transform the data so that we can have normally distributed residuals.
+
+```{r}
+plot(mpg$weight, mpg$mpg)
+abline(mod, col='red', lty = 2)
+legend('topleft', legend = 'Regression Line', lty = 2, col = 'red', bg = 'pink')
+```
+
+```{r}
+mod2 <- lm(log(mpg) ~ weight,data = mpg)
+summary(mod2)
+```
+
+By conducting a log transformation on the dependent variable (weight) we able to improve the significance of the model, and increase the R-Squared so we know that it is better at explaining the variation of the data. In this model for every one unit of weight there is a .0003 decrease in log mpg, and if the weight was zero then the vehicle would have a log mpg of 4.14.
+
+```{r Fig4, echo=TRUE, fig.height = 7, fig.width=10}
+par(mfrow = c(2,2))
+plot(mod2)
+```
+
+The residual plots show that the assumption of homoscedasticity is satisfied as the residuals are basically normal.
+
+```{r}
+plot(mpg$weight, log(mpg$mpg))
+abline(mod2, col='red', lty = 2)
+legend('topleft', legend = 'Regression Line', lty = 2, col = 'red', bg = 'pink')
+```
+
+By plotting the regression line over the true data shows how well the model can follow the trend of the data.
+
+# Reference
+
+Quinlan,R.. (1993). Auto MPG. UCI Machine Learning Repository. <https://doi.org/10.24432/C5859H.>

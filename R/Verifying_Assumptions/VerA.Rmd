@@ -1,0 +1,161 @@
+---
+title: "Verifying Assumptions"
+author: "Zander Bonnet"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+miniPONS <- read.csv("~/Desktop/GCU/DSC_520/Data/Database MiniPONS.csv", sep=";", stringsAsFactors=TRUE)
+sum(is.na(miniPONS))
+head(miniPONS)
+```
+
+There are no missing values.
+
+```{r,fig.height= 8, fig.width= 12}
+library(ggplot2)
+library(reshape2)
+
+corr_mat <- round(cor(miniPONS[,-c(1:2)]),3)
+melt_corr_mat <- melt(corr_mat)
+plt <- ggplot(data = melt_corr_mat, aes(x = Var1, y = Var2, fill = value)) 
+plt <- plt + geom_tile()
+plt <- plt + geom_text(aes(Var2, Var1, label = value), color = "white", size = 6)
+plt <- plt + labs(title = 'Heatmap')
+plt
+```
+
+There are some moderatly correlated variables that could lead to possible coliniarity.
+
+```{r}
+mod <- lm(Right_answers ~., data = miniPONS)
+summary(mod)
+```
+
+There are several insignificant factors.
+
+```{r}
+mod2 <- lm(Right_answers ~. - Submissive - Negative_valence - 
+             Type - Positive_valence - Group - Age, data = miniPONS)
+summary(mod2) 
+```
+
+The model is significant, and has a perfect R-Squared so it almost perfectly explains the variance in the data.
+
+```{r}
+plot(mod2, which = 1)
+```
+
+The residual values are all very small, but there is one extreme outlier in the residuals.
+
+```{r}
+library(car)
+durbinWatsonTest(mod2)
+```
+
+The Durbin Watson Test shows the possibility of a positive autocorrelation in the residuals. Meaning that they cannot be deemed independent. This could lead to some of the predictors to be falsely significant.
+
+```{r}
+plot(mod2, which = 3)
+```
+
+The standardized residuals show that the residuals are homoscedastic for the most part. They have consistint variance and are evenly spread. Again there is just the one extreme value.
+
+```{r}
+plot(mod2, which = 2)
+```
+
+The residuals are normally distributed outside of the extreme value.
+
+```{r}
+ncvTest(mod2)
+```
+
+The test shows that there is a non constant variance in the fitted values. This is most likely due to the fact that there is the extreme value creating inconsistencies. This test differs from the Durbin Watson test because NCV tests if the values have a consistent variance, and the Durbin Watson test tests if the residuals have any autocorrelation. Meaning that the residuals depend on the previous residual.
+
+```{r}
+plot(mod2, which = 5)
+```
+
+There is one value that is largely different from the rest and has a Cook's distance of over 1. This could cause the tests to give false results, and make the models significance be questioned.
+
+```{r}
+which(abs(scale(mod2$residuals)) > 3)
+```
+
+There is one large outlier in the residuals.
+
+### Remove the outlier residual
+
+```{r}
+#remove outlier
+out <- which(abs(scale(mod2$residuals)) > 3)
+no_out <- miniPONS[-out,]
+```
+
+```{r}
+mod3 <- lm(Right_answers ~. - Submissive - Negative_valence - 
+             Type - Positive_valence - Group - Age, data = no_out)
+summary(mod3) 
+```
+
+Dominant is no longer significant after the removal of the outlier.
+
+```{r, fig.height= 7, fig.width= 10}
+mod4 <- lm(Right_answers ~. - Submissive - Negative_valence - 
+             Type - Positive_valence - Group - Age -Dominant, data = no_out)
+summary(mod4) 
+par(mfrow = c(2,2))
+plot(mod4)
+```
+
+The intercept of the model is not significant.
+
+The outlier residual was replaced with the next value.
+
+```{r, fig.height= 7, fig.width= 10}
+mod5 <- lm(log(Right_answers) ~. - Submissive - Negative_valence - 
+             Type - Positive_valence - Group - Age - Dominant, data = no_out)
+summary(mod5) 
+par(mfrow = c(2,2))
+plot(mod5)
+```
+
+When trying to perform a log transformation on the response it causes the residuals to now follow a pattern and violate the conditions of the model.
+
+When we try to remove the outliers in the data it is just replaced with another outlier, so we cannot go with that route to fix the model. When we try to apply a transformation to the data it takes away the linear relationship of the data and violates multiple conditions of the model.
+
+```{r}
+ncvTest(mod5)
+```
+
+Even after performing log transforamtion of the data there is non-constant variance in the fitted values, so the assumption of homoscedastity in the model are not met.
+
+Looking at the leverage plot we can see that there are now multiple potential outliers that are dragging the predictions down as we can see by the red line in the plot.
+
+```{r}
+#original model
+vif(mod2)
+#log transformed
+vif(mod5)
+```
+
+There is no evidence of multicoliniarity in the both of the models as the VIF scores are all less than 4.
+
+The log transformed model is not valid to be used. It does not meet the assumptions of the model as the relationship is no longer linear. Since the relationship is not linear it also fails the other assumptions of the model.
+
+If we used the original model we can gather some data from it but it still does not follow the assumptions of the model. There is the one outlier, but even though the outlier is significant it is still very close to the true value. There is the possibility of auto correlation, but the residuals are so small that it might not be significant.
+
+
+I would recommend using the original model for any predictions and analysis. The data is linear to begin with, so if we use a transformation it takes away the linearity of the data. The original model also does a very good job a predicting values based on the significant factors. There is a chance that the model is overly reported as significant, but the model is very strong.
+
+### Reference
+
+Theory of mind in remitted bipolar disorder. (2019). Kaggle [Dataset]. https://www.kaggle.com/datasets/mercheovejero/theory-of-mind-in-remitted-bipolar-disorder/data
+
+
