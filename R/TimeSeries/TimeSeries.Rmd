@@ -1,0 +1,141 @@
+---
+title: "Time Series Analysis"
+author: "Zander Bonnet"
+Date: 'Feb 26, 2025'
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+The goal of the analysis is to accurately predict future values of the data. This data is collection of data related to climate change. It contains a date column and a temp column. In this analysis I will clean and manipulate the data so that it can be efficiently used in an ARIMA model, and then build the model. With this model I will predict the next 2 years  I will choose this threshold as it will give an insight into the near future while maintaining some form of accuracy. If we were to forecast longer than this we might encounter some dramatic accuracy loss.
+
+```{r}
+library(forecast)
+library(tsutils)
+library(ggplot2)
+library(lmtest)
+library(tseries)
+library(Metrics)
+```
+
+
+```{r}
+d <- read.csv('/Users/zanderbonnet/Desktop/GCU/DSC-570/Topic_2/data/new_train.csv')
+d$date <- as.Date(d$date, format = '%d-%m-%Y')
+which(is.na(d))
+
+sc <- scale(d$temp)
+which(sc >3 | sc < -3)
+```
+The data contains no missing values and has no extreme outliers so we can proceed with the analysis.
+```{r}
+dates <- ts(d$temp, start = 1980, frequency = 365)
+head(dates)
+
+train <- dates[1:floor(length(dates)*.9)]
+test <- dates[ceiling(length(dates)*.9):length(dates)]
+```
+The data was successfully transformed into a time series object.
+```{r}
+plot(dates)
+abline(h = mean(dates), col = 'blue', lty = 2)
+abline(h = quantile(dates,.9), col = 'red', lty = 2)
+abline(h = quantile(dates,.1), col = 'red', lty = 2)
+legend(x = 'topleft', legend = c(
+  paste('Mean:', round(mean(dates),2))
+  ))
+
+```
+The data shows that it is potentially highly seasonal, and appears to be stationary with a mean of 15.7.
+
+```{r}
+tb <- tbats(dates)
+plot(tb)
+```
+Using decomposition by TBATS we can see that there is strong seasonality with a period of 1 year.
+
+```{r}
+av <- cmav(dates, outplot = T)
+abline(h = tail(av,1), col = 'blue', lty = 1)
+abline(h = head(av,1), col = 'blue', lty = 1)
+```
+The central moving average shows that data has a slight upward trend.
+```{r}
+dec <- decompose(dates)
+plot(dec)
+```
+By decomposing the data we can see that there is a positive trend over time. Just like we saw with the central moving average. We can also see that there is a strong seasonal pattern within the data.
+
+
+```{r}
+adj <- dates - dec$seasonal
+seasplot(adj)
+```
+By decomposing the data we were able to remove the seasonality and preserve the trend within the data. This is seen in the results of the seasplot function where the is no statistical evidence for seasonality and very string evidence to suggest a trend within the data.
+```{r}
+plot(adj)
+```
+The new plot shows no seasonality while maintaining the positive trend from the original data.
+
+```{r}
+adj_hw_mod <- HoltWinters(adj)
+summary(adj_hw_mod)
+plot(adj_hw_mod)
+print(adj_hw_mod$alpha)
+rmse(adj, adj_hw_mod$fitted)
+```
+When applying the Holt-Winters algorithm to the adjusted data we can see that it performs fairly well but it does have an RMSE of 11.31 on the training data. The alpha parameter is .697. This parameter is the weight that the model places on the level. This is to say how much weight do the values immediately before this value have. The higher this value the more weight they have.
+```{r}
+am_mod <- arima(adj)
+coeftest(am_mod)
+```
+Creating the arima model creates a significant model as the intercept value is statistically significant according to the coeftest function.
+
+```{r}
+fit <- Arima(adj)
+summary(fit)
+autoplot(forecast(fit, 365))
+```
+The base Arima model is able to acurtaly predict the training data with an rmse of 2.3.
+
+```{r}
+pacf(coredata(adj))
+adf.test(adj)
+acf(coredata(adj))
+am <- Arima(adj, order = c(4,1,4))
+summary(am)
+coeftest(am)
+autoplot(forecast(am,365*2))
+```
+We can increase the strength of the Arima model by tuning the parameters. By tuning the parameters I was able to get the RMSE down to about 1.7.
+
+```{r}
+summary(tb)
+rmse(dates,tb$fitted.values)
+plot(forecast(tb, 365*2))
+```
+
+```{r}
+hw_mod <- HoltWinters(dates)
+summary(hw_mod)
+rmse(dates,hw_mod$fitted)
+plot(forecast(hw_mod, 365*2))
+```
+```{r}
+plot(forecast(adj_hw_mod, 365*2))
+```
+
+I was able to build and optimize an ARIMA model that is able to predict 2 years into the future. This model is very good at predicting the training data and has a tight confidence window for the future predictions.The model predicts that the average temperature in two years would be 16.2. That is increase of 1.4 degree increase in the average yearly temperature since 1980.
+
+Looking at some of the other models we can see that TBATS also performs very well in this task, while Holt-Winters does lag behind slightly in terms of RMSE. The benefit of these models though is they do offer a more robust forecasting then in ARIMA. In many cases ARIMA gives a general trend that it predicts will be followed. While Holt-Winters and TBATS offer a more detailed prediction as can be seen above where I look at the TBATS and Holt-Winters models with both the original and decomposed data.
+
+Exponential smoothing is also helpful in situations where we need to focus more on the data nearest to the observation. This is where the alpha parameter comes in. In cases where the data changes quickly and dramatically we must be able to put more weight on data points that are closer to the observation then distant points. This allows us to accurately forecast through seasonal data.
+
+The goal of these models is to make predictions on future values within the data, and use that to make decisions. In this case we find that there will be increase in the average temperature as we look into the future. This will lead to many issues pertaining to regulation, legislation, and standards. It is our job as data scientists to look at the data objectively and lay out the data in an unbiased and ethical way. By doing this we will allow other professionals to make educated decisions. There are many aspects of the world that are dependent on things like climate change, so we must be careful on how we present our data. Large oil companies face lots of backlash when it comes to climate change, but a simple analysis could not soley place the blame on them. We presenting our findings we must be able define the scope of our findings, so they cannot be misinterpreted our used in a malicious way. In the Christian world view we are to be ethical and fair at all times, so doing these thing will allow us to accomplish that.
+
+Reference
+
+Time Series Dataset(Climate change prediction). Kaggle[Dataset]. https://www.kaggle.com/datasets/pranjalt/aurora-roundhacks/data?select=new_train.csv
+
+
+
