@@ -5,7 +5,7 @@ This repository is a compilation of my academic work from both my master's and u
 ## Contents
 
 - Master's program projects and assignments
-- Undergraduate coursework, papers, and projects
+- Undergraduate coursework, papers, and projects from SJSU are located in the SJSU folder
 - Research materials and code
 - Other relevant academic artifacts
 
