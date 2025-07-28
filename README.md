@@ -2,7 +2,7 @@
 
 This repository is a compilation of my academic work from both my master's and undergraduate programs. It serves as a personal archive of projects, assignments, and research completed throughout my studies. The content reflects a range of topics and skills developed during my educational journey.
 
-This repo also contains source code for the R package I assisted in developing, SpectralCIMixed, for more info on this, see `https://cran.r-project.org/web/packages/SpectralClMixed/index.html`.
+This repo also contains source code for the R package I assisted in developing, SpectralCIMixed, for more info on this, see (https://cran.r-project.org/web/packages/SpectralClMixed/index.html).
 
 ## Contents
 
